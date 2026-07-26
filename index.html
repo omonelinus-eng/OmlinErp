@@ -4,12 +4,29 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover">
 <title>Omlin Consultancy ERP</title>
+
+<!-- PWA / install-to-homescreen -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#15130f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Omlin ERP">
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="favicon-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+<!-- Firebase (compat build — simplest to use with no build step) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
 :root{
   --ink:#15130f;
@@ -244,13 +261,47 @@ canvas{max-width:100%;}
 .login-card h1{font-size:22px;margin:0 0 4px 0;}
 .login-card p.sub{margin:0 0 22px 0;color:var(--ink-soft);font-size:13px;}
 
+/* ---------- Responsive: tablet & phone ---------- */
+@media(max-width:1000px){
+  #sidebar{width:230px;}
+}
 @media(max-width:900px){
-  #sidebar{transform:translateX(-100%);}
+  #sidebar{transform:translateX(-100%);width:min(84vw,300px);}
   #sidebar.open{transform:translateX(0);box-shadow:0 0 40px rgba(0,0,0,.4);}
   #main{margin-left:0;}
   #menuToggle{display:flex;}
   .kpi-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));}
+  #topbar{padding:0 14px;}
 }
+@media(max-width:520px){
+  #content{padding:14px;}
+  #topbar{height:56px;padding:0 10px;}
+  #topbar .title{font-size:17px;}
+  .kpi-grid{grid-template-columns:repeat(auto-fill,minmax(135px,1fr));gap:10px;}
+  .kpi-card{padding:12px 14px;}
+  .kpi-card .value{font-size:21px;}
+  .panel{padding:14px 14px;}
+  .modal-backdrop{padding:0;align-items:stretch;}
+  .modal{max-width:100%;width:100%;border-radius:0;min-height:100vh;display:flex;flex-direction:column;}
+  .modal-body{flex:1;max-height:none;}
+  .login-card{width:100%;padding:28px 22px;border-radius:0;}
+  #loginScreen{padding:0;}
+  table.data{font-size:12.5px;}
+  .btn{padding:9px 13px;}
+}
+/* Comfortable tap targets on touch devices */
+@media(hover:none){
+  .navitem,.icon-btn,.btn,.tabbtn,.chip{min-height:38px;}
+  .navitem{padding:11px 10px;}
+}
+/* momentum scrolling + safe-area support for notched phones */
+.table-wrap,.modal-body{-webkit-overflow-scrolling:touch;}
+#sidebar{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);}
+#topbar{padding-left:max(24px, env(safe-area-inset-left));padding-right:max(24px, env(safe-area-inset-right));}
+@media(max-width:520px){
+  #topbar{padding-left:max(10px, env(safe-area-inset-left));padding-right:max(10px, env(safe-area-inset-right));}
+}
+body{overflow-x:hidden;}
 #sidebarScrim{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:35;}
 #sidebarScrim.active{display:block;}
 </style>
@@ -258,29 +309,52 @@ canvas{max-width:100%;}
 <body>
 
 <div id="loginScreen">
-  <div class="login-card">
+
+  <!-- Sign-in screen (shown once a company workspace already exists) -->
+  <div class="login-card" id="signinCard" style="display:none;">
     <div class="seal">OC</div>
     <h1>Omlin Consultancy ERP</h1>
     <p class="sub">Sign in to the operations manifest.</p>
     <div class="field">
-      <label>Full name</label>
-      <input id="loginName" placeholder="e.g. Amina Hassan">
+      <label>Email</label>
+      <input id="loginEmail" type="email" autocomplete="username" placeholder="you@omlinconsultancy.co.ke">
     </div>
     <div class="field">
-      <label>Role</label>
-      <select id="loginRole">
-        <option value="admin">Administrator</option>
-        <option value="finance">Finance</option>
-        <option value="sales">Sales</option>
-        <option value="developer">Developer</option>
-        <option value="consultant">Consultant</option>
-        <option value="designer">Designer</option>
-        <option value="support">Support</option>
-        <option value="readonly">Read-only</option>
-      </select>
+      <label>Password</label>
+      <input id="loginPassword" type="password" autocomplete="current-password" placeholder="••••••••">
     </div>
-    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:10px;" onclick="doLogin()">Enter workspace</button>
-    <p class="hint" style="margin-top:14px;">Local demo mode — data is stored in this browser. Connect Firebase in Settings → System for multi-user sync.</p>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:10px;" onclick="doLogin()" id="loginBtn">Sign in</button>
+    <p class="hint" id="loginError" style="color:var(--red);margin-top:10px;display:none;"></p>
+    <p class="hint" style="margin-top:14px;">Only administrators can create new accounts. Forgotten your password? <a href="#" onclick="doResetPassword();return false;" style="color:var(--orange);font-weight:600;">Reset it</a>.</p>
+  </div>
+
+  <!-- First-run screen (shown only when no workspace/admin exists yet) -->
+  <div class="login-card" id="setupCard" style="display:none;">
+    <div class="seal">OC</div>
+    <h1>Set up your workspace</h1>
+    <p class="sub">No account found yet — create the administrator account to get started.</p>
+    <div class="field">
+      <label>Full name</label>
+      <input id="setupName" placeholder="e.g. Laura Omollo">
+    </div>
+    <div class="field">
+      <label>Work email</label>
+      <input id="setupEmail" type="email" autocomplete="username" placeholder="you@omlinconsultancy.co.ke">
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input id="setupPassword" type="password" autocomplete="new-password" placeholder="At least 6 characters">
+    </div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:10px;" onclick="doCreateAdmin()" id="setupBtn">Create admin account</button>
+    <p class="hint" id="setupError" style="color:var(--red);margin-top:10px;display:none;"></p>
+    <p class="hint" style="margin-top:14px;">This becomes the first Administrator account. You'll add teammates later from Settings → Users &amp; Roles.</p>
+  </div>
+
+  <!-- Shown briefly while we check whether a workspace already exists -->
+  <div class="login-card" id="checkingCard">
+    <div class="seal">OC</div>
+    <h1>Omlin Consultancy ERP</h1>
+    <p class="sub">Connecting…</p>
   </div>
 </div>
 
@@ -298,7 +372,6 @@ canvas{max-width:100%;}
     <div class="userfoot">
       <div class="who" id="whoName">—</div>
       <div id="whoRole">—</div>
-      <select onchange="switchUser(this.value)" id="switchRole" style="display:none;"></select>
       <div style="margin-top:8px;"><a href="#" onclick="logout();return false;" style="font-size:12px;color:var(--orange);">Sign out</a></div>
     </div>
   </aside>
@@ -332,6 +405,45 @@ canvas{max-width:100%;}
    ========================================================= */
 
 const DB_KEY = 'omlin_erp_db_v1';
+
+/* =========================================================
+   FIREBASE CONFIG
+   ---------------------------------------------------------
+   Paste your project's config object below (Firebase Console
+   → Project settings → General → Your apps → SDK setup and
+   configuration → "Config"). Until real values are pasted in,
+   FIREBASE_ENABLED stays false and the app runs in local demo
+   mode (localStorage only, name+role login) exactly as before,
+   so the ERP is fully usable while you wire this up.
+   ========================================================= */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAtbGlXW4WplKJ9wVX7Ee5ScllI1FJc66E",
+  authDomain: "omlinerp.firebaseapp.com",
+  projectId: "omlinerp",
+  storageBucket: "omlinerp.firebasestorage.app",
+  messagingSenderId: "378552004776",
+  appId: "1:378552004776:web:1b93e9eb43b7e46a1d129d"
+};
+const FIREBASE_ENABLED = !!(FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey.indexOf('REPLACE_WITH') === -1);
+
+let fbApp = null, fbAuth = null, fbDb = null, fbSecondaryApp = null, fbSecondaryAuth = null;
+let unsubscribeCloud = null;
+// Single company document — the whole state.db blob lives here, mirroring
+// the previous single-blob localStorage design so all existing render
+// code (which reads/writes state.db.*) keeps working unchanged.
+const CLOUD_DOC_PATH = ['company', 'main'];
+const CLOUD_USERS_META_PATH = ['company', 'meta']; // marks whether setup/admin creation has happened
+
+if (FIREBASE_ENABLED) {
+  fbApp = firebase.initializeApp(FIREBASE_CONFIG);
+  fbAuth = firebase.auth();
+  fbDb = firebase.firestore();
+  fbDb.enablePersistence({ synchronizeTabs: true }).catch(()=>{ /* offline persistence unavailable (private mode / multiple tabs) — app still works online */ });
+  // Secondary app instance so an admin can create a teammate's account
+  // without Firebase swapping the admin's own signed-in session.
+  fbSecondaryApp = firebase.initializeApp(FIREBASE_CONFIG, 'Secondary');
+  fbSecondaryAuth = fbSecondaryApp.auth();
+}
 const CATEGORY_LIST = [
   'Custom Software Development','E-Commerce Solutions','Website Development',
   'Data Analysis & Reporting','Business Automation','Logistics Consultancy',
@@ -375,18 +487,24 @@ function defaultDB(){
 
 const state = {
   db: null,
-  user: {name:'', role:'admin'},
+  user: {name:'', role:'admin', uid:null, email:'', customAccess:null},
   activeSection: 'dashboard',
 };
 
-function loadDB(){
+function loadLocalDB(){
   try{
     const raw = localStorage.getItem(DB_KEY);
     state.db = raw ? JSON.parse(raw) : defaultDB();
     if(!state.db.counters) state.db.counters = {quotation:1, invoice:1, project:1};
   }catch(e){ state.db = defaultDB(); }
 }
-function saveDB(){ localStorage.setItem(DB_KEY, JSON.stringify(state.db)); }
+function saveDB(){
+  localStorage.setItem(DB_KEY, JSON.stringify(state.db));
+  if(FIREBASE_ENABLED && fbDb){
+    fbDb.collection(CLOUD_DOC_PATH[0]).doc(CLOUD_DOC_PATH[1]).set(state.db)
+      .catch(err=> toast('Sync error: '+err.message));
+  }
+}
 
 function nextNumber(kind){
   const fmt = kind==='quotation' ? state.db.settings.quoteNumFormat : state.db.settings.invoiceNumFormat;
@@ -404,29 +522,154 @@ const NAV_PERMISSIONS = { // which roles can see which section; admin sees all
   support:['admin','finance','support','sales'], financials:['admin','finance'], reports:['admin','finance','sales'],
   documents:'all', users:['admin'], notifications:'all', settings:['admin']
 };
+function defaultAccessForRole(role){
+  return NAV_CONFIG.flatMap(g=>g.items).filter(it=>{
+    if(role==='admin') return true;
+    const rule = NAV_PERMISSIONS[it.id];
+    if(rule==='all') return true;
+    return Array.isArray(rule) && rule.includes(role);
+  }).map(it=>it.id);
+}
 function canSee(sectionId){
   if(state.user.role==='admin') return true;
+  if(Array.isArray(state.user.customAccess)) return state.user.customAccess.includes(sectionId);
   const rule = NAV_PERMISSIONS[sectionId];
   if(rule==='all') return true;
   return Array.isArray(rule) && rule.includes(state.user.role);
 }
 
-/* ---------- Auth (local demo) ---------- */
-function doLogin(){
-  const name = document.getElementById('loginName').value.trim();
-  const role = document.getElementById('loginRole').value;
-  if(!name){ toast('Enter your name to continue.'); return; }
-  state.user = {name, role};
-  localStorage.setItem('omlin_erp_user', JSON.stringify(state.user));
-  if(!state.db.users.find(u=>u.name.toLowerCase()===name.toLowerCase())){
-    state.db.users.push({id:uid(), name, role}); saveDB();
-  }
+/* =========================================================
+   AUTH
+   - If FIREBASE_ENABLED: real email/password accounts via
+     Firebase Auth, with a Firestore doc (company/main) holding
+     the whole app database, synced live to every signed-in user.
+   - If not (no config pasted in yet): falls back to the original
+     local-only, name+role, localStorage demo so the app still
+     works out of the box.
+   ========================================================= */
+function showLoginSubScreen(which){
+  ['checkingCard','signinCard','setupCard'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.style.display = (id===which) ? 'block' : 'none';
+  });
+}
+function enterWorkspace(){
   document.getElementById('loginScreen').style.display='none';
   document.getElementById('app').style.display='flex';
   boot();
 }
-function logout(){ localStorage.removeItem('omlin_erp_user'); location.reload(); }
-function switchUser(role){ state.user.role = role; document.getElementById('whoRole').textContent = ROLE_LABELS[role]; buildNav(); renderSection(state.activeSection); }
+function friendlyAuthError(err){
+  const map = {
+    'auth/invalid-email':'That email address looks invalid.',
+    'auth/user-not-found':'No account found with that email.',
+    'auth/wrong-password':'Incorrect password.',
+    'auth/invalid-credential':'Incorrect email or password.',
+    'auth/email-already-in-use':'That email is already registered.',
+    'auth/weak-password':'Password must be at least 6 characters.',
+    'auth/too-many-requests':'Too many attempts — please wait a moment and try again.',
+    'auth/network-request-failed':'Network error — check your connection.'
+  };
+  return (err && map[err.code]) || (err && err.message) || 'Something went wrong. Please try again.';
+}
+
+const LOCAL_DEMO_LOGIN_HTML = `
+    <div class="seal">OC</div>
+    <h1>Omlin Consultancy ERP</h1>
+    <p class="sub">Sign in to the operations manifest.</p>
+    <div class="field">
+      <label>Full name</label>
+      <input id="loginName" placeholder="e.g. Amina Hassan">
+    </div>
+    <div class="field">
+      <label>Role</label>
+      <select id="loginRole">
+        ${Object.entries(ROLE_LABELS).map(([r,l])=>`<option value="${r}">${l}</option>`).join('')}
+      </select>
+    </div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:10px;" onclick="doLogin()">Enter workspace</button>
+    <p class="hint" style="margin-top:14px;">Local demo mode — data is stored only in this browser. Paste your project config into FIREBASE_CONFIG near the top of the script to enable real, multi-user accounts.</p>`;
+
+function doLogin(){ return FIREBASE_ENABLED ? doLoginCloud() : doLoginLocal(); }
+
+function doLoginCloud(){
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError'); errEl.style.display='none';
+  if(!email || !password){ errEl.textContent='Enter your email and password.'; errEl.style.display='block'; return; }
+  const btn = document.getElementById('loginBtn'); btn.disabled = true; btn.textContent='Signing in…';
+  fbAuth.signInWithEmailAndPassword(email, password)
+    .catch(err=>{ errEl.textContent = friendlyAuthError(err); errEl.style.display='block'; })
+    .finally(()=>{ btn.disabled=false; btn.textContent='Sign in'; });
+}
+function doLoginLocal(){
+  const name = document.getElementById('loginName').value.trim();
+  const role = document.getElementById('loginRole').value;
+  if(!name){ toast('Enter your name to continue.'); return; }
+  state.user = {name, role, uid:null, email:'', customAccess:null};
+  localStorage.setItem('omlin_erp_user', JSON.stringify(state.user));
+  if(!state.db.users.find(u=>u.name.toLowerCase()===name.toLowerCase())){
+    state.db.users.push({id:uid(), name, role}); saveDB();
+  }
+  enterWorkspace();
+}
+function doResetPassword(){
+  if(!FIREBASE_ENABLED){ toast('Firebase is not configured yet.'); return; }
+  const email = document.getElementById('loginEmail').value.trim();
+  if(!email){ toast('Enter your email above first, then tap Reset it.'); return; }
+  fbAuth.sendPasswordResetEmail(email)
+    .then(()=> toast('Password reset email sent to '+email+'.'))
+    .catch(err=> toast(friendlyAuthError(err)));
+}
+function doCreateAdmin(){
+  const name = document.getElementById('setupName').value.trim();
+  const email = document.getElementById('setupEmail').value.trim();
+  const password = document.getElementById('setupPassword').value;
+  const errEl = document.getElementById('setupError'); errEl.style.display='none';
+  if(!name || !email || !password){ errEl.textContent='Fill in your name, email and password.'; errEl.style.display='block'; return; }
+  if(password.length < 6){ errEl.textContent='Password must be at least 6 characters.'; errEl.style.display='block'; return; }
+  const btn = document.getElementById('setupBtn'); btn.disabled = true; btn.textContent='Creating…';
+  fbAuth.createUserWithEmailAndPassword(email, password)
+    .then(cred=>{
+      const db = defaultDB();
+      db.users = [{id: uid(), uid: cred.user.uid, name, email, role:'admin', customAccess:null}];
+      return fbDb.collection(CLOUD_DOC_PATH[0]).doc(CLOUD_DOC_PATH[1]).set(db);
+    })
+    .catch(err=>{ errEl.textContent = friendlyAuthError(err); errEl.style.display='block'; })
+    .finally(()=>{ btn.disabled=false; btn.textContent='Create admin account'; });
+}
+function logout(){
+  if(unsubscribeCloud){ unsubscribeCloud(); unsubscribeCloud = null; }
+  if(FIREBASE_ENABLED){ fbAuth.signOut().then(()=>location.reload()); }
+  else { localStorage.removeItem('omlin_erp_user'); location.reload(); }
+}
+
+function startCloudForUser(fbUser){
+  const docRef = fbDb.collection(CLOUD_DOC_PATH[0]).doc(CLOUD_DOC_PATH[1]);
+  unsubscribeCloud = docRef.onSnapshot(snap=>{
+    if(!snap.exists) return;
+    state.db = snap.data();
+    if(!state.db.counters) state.db.counters = {quotation:1, invoice:1, project:1};
+    try{ localStorage.setItem(DB_KEY, JSON.stringify(state.db)); }catch(e){}
+
+    const myRecord = (state.db.users||[]).find(u=>u.uid===fbUser.uid);
+    if(!myRecord){
+      toast('Your account is no longer authorized. Contact your administrator.');
+      logout();
+      return;
+    }
+    state.user = {name: myRecord.name, role: myRecord.role, uid: fbUser.uid, email: myRecord.email||'', customAccess: myRecord.customAccess || null};
+
+    const appHidden = document.getElementById('app').style.display === 'none';
+    if(appHidden){
+      enterWorkspace();
+    } else {
+      document.getElementById('whoName').textContent = state.user.name;
+      document.getElementById('whoRole').textContent = ROLE_LABELS[state.user.role];
+      buildNav(); renderSection(state.activeSection); refreshNotifBadge();
+    }
+  }, err=>{ toast('Sync error: '+err.message); });
+}
+
 
 /* ---------- Toast ---------- */
 function toast(msg){
@@ -533,13 +776,31 @@ function boot(){
   refreshNotifBadge();
 }
 window.addEventListener('DOMContentLoaded', ()=>{
-  loadDB();
-  const savedUser = localStorage.getItem('omlin_erp_user');
-  if(savedUser){
-    state.user = JSON.parse(savedUser);
-    document.getElementById('loginScreen').style.display='none';
-    document.getElementById('app').style.display='flex';
-    boot();
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('sw.js').catch(()=>{ /* fine if unavailable, e.g. file:// preview */ });
+  }
+
+  if(FIREBASE_ENABLED){
+    showLoginSubScreen('checkingCard');
+    fbAuth.onAuthStateChanged(fbUser=>{
+      if(fbUser){
+        startCloudForUser(fbUser);
+      } else {
+        if(unsubscribeCloud){ unsubscribeCloud(); unsubscribeCloud = null; }
+        fbDb.collection(CLOUD_DOC_PATH[0]).doc(CLOUD_DOC_PATH[1]).get()
+          .then(snap=>{ showLoginSubScreen(snap.exists ? 'signinCard' : 'setupCard'); })
+          .catch(()=>{ showLoginSubScreen('signinCard'); });
+      }
+    });
+  } else {
+    loadLocalDB();
+    document.getElementById('signinCard').innerHTML = LOCAL_DEMO_LOGIN_HTML;
+    showLoginSubScreen('signinCard');
+    const savedUser = localStorage.getItem('omlin_erp_user');
+    if(savedUser){
+      state.user = JSON.parse(savedUser);
+      enterWorkspace();
+    }
   }
 });
 
@@ -1828,38 +2089,138 @@ function saveDoc(){
    USERS & ROLES
    ========================================================= */
 function renderUsers(root){
+  const isAdmin = state.user.role==='admin';
   root.innerHTML = `
   <div class="panel">
-    <div class="panel-head"><h3>Users</h3></div>
+    <div class="panel-head"><h3>Users</h3>${isAdmin? `<button class="btn btn-primary" onclick="openAddUserForm()">+ Add User</button>` : ''}</div>
     <div class="table-wrap"><table class="data" id="userTable"></table></div>
+    ${FIREBASE_ENABLED ? '<div class="hint" style="margin-top:10px;">Adding a user here creates a real sign-in for them (Firebase Authentication).</div>' : '<div class="hint" style="margin-top:10px;">Local demo mode: users just appear here after typing their name at sign-in, or you can add one manually below. Paste your FIREBASE_CONFIG near the top of the script to switch to real logins.</div>'}
   </div>
   <div class="panel">
     <h3>Role Permissions Reference</h3>
-    <div class="hint">Administrators always have full access. Other roles see only the sections listed.</div>
+    <div class="hint">Administrators always have full access. Other roles default to the sections listed below, unless a user has custom "Areas of Access" set individually.</div>
     <div class="table-wrap" style="margin-top:10px;"><table class="data"><thead><tr><th>Section</th><th>Roles with access</th></tr></thead>
     <tbody>${Object.entries(NAV_PERMISSIONS).map(([k,v])=>`<tr><td>${titleFor(k)}</td><td>${v==='all'?'All roles':v.map(r=>ROLE_LABELS[r]).join(', ')}</td></tr>`).join('')}</tbody></table></div>
   </div>`;
   RENDER_REFRESH.users = filterUsers;
   filterUsers();
 }
+function accessSummary(u){
+  if(u.role==='admin') return 'Full access';
+  if(Array.isArray(u.customAccess)) return u.customAccess.length ? u.customAccess.map(titleFor).join(', ') : 'No sections assigned';
+  return 'Default for '+(ROLE_LABELS[u.role]||u.role);
+}
 function filterUsers(){
   let rows = applySort('users', state.db.users, (u,key)=>({name:u.name, role:ROLE_LABELS[u.role]||u.role}[key]));
   const tbl = document.getElementById('userTable');
   const th = (key,label)=>`<th style="cursor:pointer;user-select:none;" onclick="setSort('users','${key}')">${label} ${sortIndicator('users',key)}</th>`;
-  tbl.innerHTML = `<thead><tr>${th('name','Name')}${th('role','Role')}<th></th></tr></thead>
-  <tbody>${ rows.length? rows.map(u=>`<tr><td>${u.name}</td><td><select onchange="setUserRole('${u.id}', this.value)">${Object.keys(ROLE_LABELS).map(r=>`<option value="${r}" ${r===u.role?'selected':''}>${ROLE_LABELS[r]}</option>`).join('')}</select></td>
-    <td style="text-align:right;"><button class="btn btn-sm btn-ghost btn-danger" onclick="deleteUser('${u.id}')">Delete</button></td></tr>`).join('') : '<tr class="empty-row"><td colspan="3">No users yet — they appear here after signing in.</td></tr>' }</tbody>`;
+  const isAdmin = state.user.role==='admin';
+  tbl.innerHTML = `<thead><tr>${th('name','Name')}${th('role','Role')}<th>Areas of Access</th><th></th></tr></thead>
+  <tbody>${ rows.length? rows.map(u=>`<tr>
+    <td>${u.name}${u.email?`<div class="hint">${u.email}</div>`:''}</td>
+    <td>${isAdmin ? `<select onchange="setUserRole('${u.id}', this.value)">${Object.keys(ROLE_LABELS).map(r=>`<option value="${r}" ${r===u.role?'selected':''}>${ROLE_LABELS[r]}</option>`).join('')}</select>` : (ROLE_LABELS[u.role]||u.role)}</td>
+    <td style="font-size:12.5px;">${accessSummary(u)}</td>
+    <td style="text-align:right;white-space:nowrap;">${isAdmin ? `<button class="btn btn-sm btn-ghost" onclick="openAccessEditor('${u.id}')">Edit access</button> <button class="btn btn-sm btn-ghost btn-danger" onclick="deleteUser('${u.id}')">Remove</button>` : ''}</td>
+  </tr>`).join('') : '<tr class="empty-row"><td colspan="4">No users yet.</td></tr>' }</tbody>`;
 }
 function setUserRole(id, role){
-  const u = state.db.users.find(x=>x.id===id); u.role = role; saveDB();
-  if(state.user.name===u.name){ state.user.role = role; localStorage.setItem('omlin_erp_user', JSON.stringify(state.user)); buildNav(); }
+  const u = state.db.users.find(x=>x.id===id); u.role = role; u.customAccess = null; saveDB();
+  if(state.user.uid && state.user.uid===u.uid){ state.user.role = role; state.user.customAccess = null; buildNav(); }
+  else if(!FIREBASE_ENABLED && state.user.name===u.name){ state.user.role = role; localStorage.setItem('omlin_erp_user', JSON.stringify(state.user)); buildNav(); }
   toast('Role updated.'); filterUsers();
 }
 function deleteUser(id){
   const u = state.db.users.find(x=>x.id===id);
-  confirmAction('Remove user "'+u.name+'"? They can sign back in again later to re-appear here.', ()=>{
+  if(FIREBASE_ENABLED && u.uid && u.uid===state.user.uid){ toast("You can't remove your own account while signed in."); return; }
+  const msg = FIREBASE_ENABLED
+    ? 'Remove "'+u.name+'" from this workspace? Their sign-in stops working immediately. To fully delete their Firebase Authentication account too, remove it from the Firebase Console — a browser app can\'t delete another user\'s auth account on its own.'
+    : 'Remove user "'+u.name+'"? They can sign back in again later to re-appear here.';
+  confirmAction(msg, ()=>{
     state.db.users = state.db.users.filter(x=>x.id!==id); saveDB(); toast('User removed.'); filterUsers();
   });
+}
+
+/* ---- Add user (creates a real Firebase Auth account when connected) ---- */
+function openAddUserForm(){
+  openModal('Add User', `
+    <div class="field"><label>Full name</label><input id="au_name" placeholder="e.g. Kevin Mutua"></div>
+    ${FIREBASE_ENABLED ? `
+    <div class="field-row">
+      <div class="field"><label>Email</label><input id="au_email" type="email" placeholder="name@omlinconsultancy.co.ke"></div>
+      <div class="field"><label>Temporary password</label><input id="au_password" type="text" placeholder="At least 6 characters"></div>
+    </div>` : ''}
+    <div class="field"><label>Role</label><select id="au_role" onchange="refreshAccessCheckboxes(this.value)">${Object.keys(ROLE_LABELS).map(r=>`<option value="${r}">${ROLE_LABELS[r]}</option>`).join('')}</select></div>
+    <div class="field">
+      <label>Areas of access</label>
+      <div class="hint" style="margin-bottom:6px;">Defaults to the role above — tap to customize which sections they can see.</div>
+      <div class="chip-row" id="au_access"></div>
+    </div>
+    <div class="hint">${FIREBASE_ENABLED ? 'This creates a real sign-in — share the email and password above with them securely (e.g. in person or over the phone).' : 'Local demo mode: this adds them to the roster now; they can also just type their name at sign-in to appear here automatically.'}</div>
+  `, `<button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveNewUser()">Create user</button>`);
+  refreshAccessCheckboxes(document.getElementById('au_role').value);
+}
+function refreshAccessCheckboxes(role){
+  const wrap = document.getElementById('au_access'); if(!wrap) return;
+  const defaults = defaultAccessForRole(role);
+  wrap.innerHTML = NAV_CONFIG.flatMap(g=>g.items).map(it=>
+    `<span class="chip ${defaults.includes(it.id)?'selected':''}" data-section="${it.id}" onclick="this.classList.toggle('selected')">${it.label}</span>`
+  ).join('');
+}
+function saveNewUser(){
+  const name = document.getElementById('au_name').value.trim();
+  const role = document.getElementById('au_role').value;
+  const chosen = Array.from(document.querySelectorAll('#au_access .chip.selected')).map(c=>c.dataset.section);
+  const defaults = defaultAccessForRole(role);
+  const customAccess = (chosen.slice().sort().join(',') === defaults.slice().sort().join(',')) ? null : chosen;
+
+  if(!name){ toast('Enter a name.'); return; }
+
+  if(!FIREBASE_ENABLED){
+    if(state.db.users.find(u=>u.name.toLowerCase()===name.toLowerCase())){ toast('A user with that name already exists.'); return; }
+    state.db.users.push({id:uid(), name, role, customAccess}); saveDB(); closeModal(); toast('User added.'); filterUsers();
+    return;
+  }
+
+  const email = document.getElementById('au_email').value.trim();
+  const password = document.getElementById('au_password').value;
+  if(!email || !password){ toast('Enter an email and temporary password.'); return; }
+  if(password.length < 6){ toast('Password must be at least 6 characters.'); return; }
+
+  fbSecondaryAuth.createUserWithEmailAndPassword(email, password)
+    .then(cred=>{
+      state.db.users.push({id:uid(), uid:cred.user.uid, name, email, role, customAccess});
+      saveDB();
+      return fbSecondaryAuth.signOut();
+    })
+    .then(()=>{
+      closeModal();
+      toast('User created — share these details with '+name+': '+email+' / '+password);
+      filterUsers();
+    })
+    .catch(err=> toast(friendlyAuthError(err)));
+}
+
+/* ---- Edit an existing user's areas of access ---- */
+function openAccessEditor(id){
+  const u = state.db.users.find(x=>x.id===id);
+  const current = Array.isArray(u.customAccess) ? u.customAccess : defaultAccessForRole(u.role);
+  openModal('Edit Access — '+u.name, `
+    <div class="hint" style="margin-bottom:10px;">Tick the sections ${u.name} should see. This overrides their role's default access.</div>
+    <div class="chip-row" id="ea_access">${NAV_CONFIG.flatMap(g=>g.items).map(it=>`<span class="chip ${current.includes(it.id)?'selected':''}" data-section="${it.id}" onclick="this.classList.toggle('selected')">${it.label}</span>`).join('')}</div>
+  `, `<button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-ghost" onclick="resetAccessToRole('${id}')">Reset to role default</button><button class="btn btn-primary" onclick="saveAccessEditor('${id}')">Save</button>`);
+}
+function saveAccessEditor(id){
+  const u = state.db.users.find(x=>x.id===id);
+  u.customAccess = Array.from(document.querySelectorAll('#ea_access .chip.selected')).map(c=>c.dataset.section);
+  saveDB();
+  if(state.user.uid && state.user.uid===u.uid) { state.user.customAccess = u.customAccess; buildNav(); }
+  closeModal(); toast('Access updated.'); filterUsers();
+}
+function resetAccessToRole(id){
+  const u = state.db.users.find(x=>x.id===id);
+  u.customAccess = null; saveDB();
+  if(state.user.uid && state.user.uid===u.uid){ state.user.customAccess = null; buildNav(); }
+  closeModal(); toast('Access reset to role default.'); filterUsers();
 }
 
 /* =========================================================
@@ -1908,14 +2269,52 @@ function renderSettings(root){
     </div>
     <div class="panel">
       <h3>Backend Connection</h3>
-      <div class="hint" style="margin-bottom:12px;">This build runs on local browser storage so it works immediately. To enable multi-user real-time sync, authentication, and file storage, connect Firebase (Auth + Firestore + Storage) in your deployment — this is a one-time developer setup, not something end users configure here.</div>
-      <div class="field"><label>Firebase Project ID (reference only)</label><input id="st_fbproj" placeholder="omlin-consultancy-erp" disabled></div>
-      <div class="hint">Once connected, every module above reads and writes to Firestore instead of localStorage, and the Documents module stores real files in Firebase Storage.</div>
+      ${FIREBASE_ENABLED ? `
+      <div class="hint" style="margin-bottom:8px;">
+        <span class="pill pill-green" style="margin-right:6px;">Connected</span>
+        Signed in as <strong>${state.user.email||state.user.name}</strong>. Every module reads and writes to Firestore in real time — all signed-in teammates see the same data.
+      </div>
+      <div class="field"><label>Firebase Project ID</label><input value="${FIREBASE_CONFIG.projectId}" disabled></div>
+      ` : `
+      <div class="hint" style="margin-bottom:12px;"><span class="pill pill-orange" style="margin-right:6px;">Local demo mode</span> Data is stored only in this browser (no multi-user sync yet). Paste your project's config into the <span class="mono">FIREBASE_CONFIG</span> object near the top of the script, then reload, to enable real accounts and live sync across devices.</div>
+      `}
       <div class="divider"></div>
       <h3>Data</h3>
       <button class="btn" onclick="exportAllData()">Export All Data (JSON)</button>
     </div>
+    <div class="panel" style="border-color:var(--red);">
+      <h3 style="color:var(--red);">Danger Zone</h3>
+      <div class="hint" style="margin-bottom:12px;">This build ships with sample leads, quotations, invoices, clients, projects and support records so you can see how the ERP works. Once you're ready to go live, wipe them out to start with a clean, real workspace. Your service catalogue, settings and user accounts are kept.</div>
+      <button class="btn btn-danger" style="border-color:var(--red);" onclick="wipeSeedDataPrompt()">Wipe Seed Data — Start Fresh</button>
+    </div>
   </div>`;
+}
+function wipeSeedDataPrompt(){
+  openModal('Wipe seed data?', `
+    <p style="font-size:14px;">This permanently deletes all <strong>sample</strong> records from this workspace:</p>
+    <ul style="font-size:13px;color:var(--ink-soft);margin:8px 0 14px 18px;">
+      <li>Leads, quotations &amp; invoices</li>
+      <li>Clients</li>
+      <li>Projects, time entries &amp; expenses</li>
+      <li>Support packages &amp; documents</li>
+    </ul>
+    <div class="field"><label><input type="checkbox" id="wp_catalog" style="width:auto;display:inline-block;vertical-align:middle;margin-right:6px;">Also clear the Service Catalogue &amp; Categories</label></div>
+    <div class="field"><label>Type DELETE to confirm</label><input id="wp_confirm" placeholder="DELETE"></div>
+  `, `<button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" style="background:var(--red);border-color:var(--red);" onclick="wipeSeedData()">Wipe data</button>`);
+}
+function wipeSeedData(){
+  const typed = document.getElementById('wp_confirm').value.trim().toUpperCase();
+  if(typed !== 'DELETE'){ toast('Type DELETE to confirm.'); return; }
+  const alsoClearCatalog = document.getElementById('wp_catalog').checked;
+
+  state.db.leads = []; state.db.quotations = []; state.db.invoices = [];
+  state.db.clients = []; state.db.projects = []; state.db.timeEntries = [];
+  state.db.expenses = []; state.db.support = []; state.db.documents = [];
+  state.db.counters = {quotation:1, invoice:1, project:1};
+  if(alsoClearCatalog){ state.db.services = []; state.db.categories = []; }
+
+  saveDB(); closeModal(); toast('Seed data cleared — this workspace is now ready for real data.');
+  renderSection(state.activeSection);
 }
 function saveSettings(){
   Object.assign(state.db.settings, {
@@ -1931,19 +2330,29 @@ function saveSettings(){
 function exportAllData(){ downloadBlob(JSON.stringify(state.db,null,2), 'omlin-erp-data.json', 'application/json'); }
 
 /* =========================================================
-   FIREBASE HOOK (placeholder for future connection)
+   FIREBASE WIRING — how it fits together
    ---------------------------------------------------------
-   To move from localStorage to Firestore:
-   1. Add the Firebase SDK script tags and firebaseConfig.
-   2. Replace loadDB()/saveDB() with Firestore reads/writes
-      (e.g. onSnapshot listeners per collection).
-   3. Replace the local login with firebase.auth()
-      (email/password or Google), and store the role as a
-      custom claim or a field on the user's Firestore doc.
-   4. Replace openDocForm()'s local file capture with an
-      upload to Firebase Storage, saving the resulting URL.
-   The UI and business logic above do not need to change —
-   only loadDB/saveDB and doLogin/logout need real backends.
+   - Paste real values into FIREBASE_CONFIG near the top of this
+     script (search for "FIREBASE CONFIG"). Until you do, the app
+     runs in local demo mode automatically.
+   - Auth: email/password via firebase.auth(). The first person
+     ever to open the app creates the Administrator account
+     (doCreateAdmin). After that, only an admin can add teammates
+     (openAddUserForm -> a *secondary* Firebase app instance so
+     the admin's own session isn't replaced).
+   - Data: the entire state.db object is stored as one Firestore
+     document at company/main, kept in sync everywhere via
+     onSnapshot (startCloudForUser) — this mirrors the previous
+     single-blob localStorage design, so none of the module code
+     above (leads, quotations, invoices, etc.) needed to change.
+   - Offline support: fbDb.enablePersistence() gives Firestore's
+     own IndexedDB-backed offline cache and write queue, so the
+     app keeps working without a connection and syncs once back
+     online. A plain localStorage mirror is also kept as a
+     belt-and-braces fallback.
+   - Documents module still stores file *names/metadata* only
+     (no file upload yet). To store the actual files, add
+     Firebase Storage and upload from openDocForm()/saveDoc().
    ========================================================= */
 </script>
 
